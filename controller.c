@@ -8,23 +8,45 @@
 #include <time.h>
 #include <modbus/modbus.h>
 
-//Estados da Máquina MODOS
-typedef enum {
-    PARADO,OPERAR,A_PARAR,WAIT,FLUSH
-} estadosMODOS;
+//TEMPORIZADOR
+typedef struct {
+    bool on; 
+    uint64_t time; 
+} timerBlock;
 
-//Estados da máquina SEPARAR
+//Estados do Tapete 1
+typedef enum {
+    
+} estadosT1;
+
+//Estados do Tapete 2
 typedef enum{
-    IDLE,SV1_AZUL,SV2_AZUL,SV1_VERDE,SV2_VERDE
-} estadosSEPARAR;
+    
+} estadosT2;
+
+//Estados do Tapete 3
+typedef enum{
+    
+} estadosT3;
+
+//Estados do Tapete 3
+typedef enum{
+    
+} estadosT4;
 
 typedef enum{
     lwaitON, lwaitOFF
 } estadosBLINK;
 
+
+// Declara variáveis para calculo do tempo de ciclo
+uint64_t start_time=0, end_time=0, cycle_time=0;
+
+// Declara temporizadores 
+timerBlock timer1, timer2;
+
+
 //Estados iniciais
-estadosMODOS modo = PARADO;
-estadosSEPARAR separarState = IDLE;
 estadosBLINK blinkState = lwaitOFF;
 
 //Funções flanco
@@ -51,144 +73,77 @@ bool flanco_descendente (bool sensor){
 
 int main{
 
-    //MODOS
-
-    switch (modo)
-    {
-    case PARADO:
-        if (flanco_descendente(START)){
-
-            C_AZUIS = 0;
-            C_VERDES = 0;
-            
-            modo = OPERAR;
-        }
-        break;
-    
-    case OPERAR:
-        if (flanco_descendente(STOP) modo = A_PARAR;
-        break;
-
-    case A_PARAR:
+    while(1){
         
-        if (SV==0) modo = WAIT; //tem de ser flanco??
-        break;
+        update_timers();
+        read_inputs();
 
-    case WAIT:
+        /*-------------TRANSIÇÃO DE ESTADOS----------*/
 
-        while (SV=0){
-            //start timer
-            if (t>10s){
-                modo = FLUSH;
+        //BLINK
+        switch (blinkState){
+    
+            case lwaitON:
+
+            timer = 0;
+            if (PARADO) {
+                blinkState = lwaitOFF;
+                break;
+            }
+
+            if (timer>1)
+            blinkState = lwaitOFF;
+            break;
+    
+            case lwaitOFF:
+
+            timer = 0;
+            if (flanco_descendente(STOP)){ 
+                blinkState = lwaitON;
+                break;
+            }   
+            if (timer>1){                       //fazer update ao timer??
+                blinkState = lwaitON;
                 break;
             } 
-        if (modo!=FLUSH){
-            modo = A_PARAR;
-            //restart timer
-        } 
-        break;
+        }
 
-    case FLUSH:
-        if (t>15s) modo = PARADO;
-        break;
-    }
 
-    //SEPARAR
 
-    switch (separarState){
-    case IDLE:
-        if (SV1 = 1) separarState = SV1_AZUL; 
-        break;
-    case T1_AZUL:
-        break;
-    case T1_VERDE:
-        break;
-    case T4_VERDE:
-        break;
-    case T4_AZUL:
-        break;
-    case MANTER_T2:
-        break;
-    case MANTER_T3:
-        break;
-    }
+        /*--------OUTPUTS----------*/
 
-    //BLINK
 
-    switch (blinkState)
-    {
-    case lwaitON:
-        if (t>1s) blinkState = lwaitOFF;
-        t = 0;
-        break;
+        //OUTPUT BLINK
+        switch (blinkState){
+        case lwaitON:
+            LWAIT = 1;
+            break;
     
-    case lwaitOFF:
-        if (t>10s) blinkState = lwaitON;
-        t=0;
-        break;
-    }
+        case lwaitOFF:
+            LWAIT = 0;
+            break;
+        }
 
-    //OUTPUTS MODOS
-
-    switch (modo){
-
-    case PARADO:
-        LSTOP = 1;
-        LWAIT = 0;
-        LSTART = 0;
-        E1 = 0,E2 = 0;
-        PE1 = 0, PR1 = 0, PE2 = 0, PR2 = 0;
-        T1A= 0,T2A = 0,T3A = 0,T4A = 0;
-        break;
+        write_outputs();
     
-    case OPERAR:
-        LSTART = 1;
-        LWAIT = 0;
-        LSTOP = 0;
-        E1 = 1,E2 = 1;
-        break;
-    case A_PARAR:
-
-        break;
-
-    default:
-        break;
     }
 
-    //OUTPUT SEPARAR
+}
 
-    switch (separarState){
-    case IDLE:              //falta verificar se estamos no estado PARADO
-        T1A = 1;
-        T4A = 1;
-        break;
-    case T1_AZUL:
-        break;
-    case T1_VERDE:
-        break;
-    case T4_VERDE:
-        break;
-    case T4_AZUL:
-        break;
-    case MANTER_T2:
-        break;
-    case MANTER_T3:
-        T3A = 1;
-        T2A = 0, T1A = 0;
-        break;
-    }
+void update_timers() {
 
+ // Calcula o tempo de ciclo
+    end_time = get_time();
 
-    //OUTPUT BLINK
-    switch (blinkState)
-    {
-    case lwaitON:
-        LWAIT = 1;
-        break;
-    
-    case lwaitOFF:
-        LWAIT = 0;
-        break;
-    }
+    if (start_time == 0)
+        cycle_time = 0;
+    else
+        cycle_time = end_time – start_time;
 
+    // o fim do ciclo atual é o inicio do próximo 
+    start_time = end_time;
+
+// Atualiza temporizadores
+    if (timer1.on) timer1.time = timer1.time + cycle_time;
+    if (timer2.on) timer2.time = timer2.time + cycle_time;
 }
