@@ -14,6 +14,7 @@ typedef struct {
     uint64_t time; 
 } timerBlock;
 
+/*
 //Estados do Tapete 1
 typedef enum {
     
@@ -32,7 +33,7 @@ typedef enum{
 //Estados do Tapete 3
 typedef enum{
     
-} estadosT4;
+} estadosT4; */
 
 typedef enum{
     lwaitON, lwaitOFF
@@ -43,66 +44,80 @@ typedef enum{
 uint64_t start_time=0, end_time=0, cycle_time=0;
 
 // Declara temporizadores 
-timerBlock timer1, timer2;
+timerBlock timerBLINK, timer2;
 
 
 //Estados iniciais
 estadosBLINK blinkState = lwaitOFF;
 
-//Funções flanco
+void update_timers();
+void start_timer(timerBlock* t);
+void stop_timer (timerBlock* t); 
 
-bool flanco_ascendente(bool sensor){
+int *previousSTART; //onde guardar o estado anterior de START
 
-    bool flanco, previous = 0;
-    if (sensor == true && previous == false) flanco = true;
+//-------Funções flanco---------
+
+bool flanco_ascendente(bool sensor, bool *previous){ //dás o sensor e o seu valor anterior
+    bool flanco;
+    if (sensor != *previous) flanco = true;
     else flanco = false;
 
     previous = sensor;
     return flanco;
 }
 
-bool flanco_descendente (bool sensor){
-    bool flanco, previous = 0;
-    if (sensor == false && previous == true) flanco = true;
+bool flanco_descendente (bool sensor, bool *previous){ //dás o sensor e o valor anterior
+    bool flanco;
+    if (sensor != *previous){
+        flanco = true;
+    }
     else flanco = false;
 
-    previous = sensor;
+    *previous = sensor;
     return flanco;
 }
 
 
-int main{
+int main() {
 
     while(1){
         
         update_timers();
         read_inputs();
 
-        /*-------------TRANSIÇÃO DE ESTADOS----------*/
+        printf("TIMER BLINK: %d\n", (int)timerBLINK.time);
+
+        if (flanco_ascendente(STOP,previousSTART))  printf("\nCLICASTE NO STOP WOW\n");          //botão STOP tem lógica negada
+        if (flanco_descendente(START,previousSTART))  printf("\nCLICASTE NO START WOW\n");  //botão START flanco git
+
+        //-------------TRANSIÇÃO DE ESTADOS----------
 
         //BLINK
-        switch (blinkState){
+        switch (blinkState){    //NEEDS CORRECTING
     
             case lwaitON:
-
-            timer = 0;
-            if (PARADO) {
+    
+            start_timer(&timerBLINK);
+            if (/*ACABAR O MODO A_PARAR*/) {
                 blinkState = lwaitOFF;
+                stop_timer(&timerBLINK);
                 break;
             }
 
-            if (timer>1)
+            if (timer2.time > 1)
             blinkState = lwaitOFF;
             break;
     
-            case lwaitOFF:
+            case lwaitOFF:         
 
-            timer = 0;
-            if (flanco_descendente(STOP)){ 
+            start_timer(&timerBLINK);
+
+            if (flanco_descendente(STOP)){ //começa a piscar?
                 blinkState = lwaitON;
                 break;
             }   
-            if (timer>1){                       //fazer update ao timer??
+            if (timerBLINK.time>1){                     
                 blinkState = lwaitON;
                 break;
             } 
@@ -110,7 +125,7 @@ int main{
 
 
 
-        /*--------OUTPUTS----------*/
+        //--------OUTPUTS----------
 
 
         //OUTPUT BLINK
@@ -129,6 +144,15 @@ int main{
     }
 
 }
+void start_timer(timerBlock* t) {   
+    t->on = true;
+    t->time = 0;
+}
+
+void stop_timer(timerBlock* t) { 
+    t->on = false;
+    t->time = 0;
+}
 
 void update_timers() {
 
@@ -138,12 +162,13 @@ void update_timers() {
     if (start_time == 0)
         cycle_time = 0;
     else
-        cycle_time = end_time – start_time;
+        cycle_time = end_time - start_time;
 
     // o fim do ciclo atual é o inicio do próximo 
     start_time = end_time;
 
 // Atualiza temporizadores
-    if (timer1.on) timer1.time = timer1.time + cycle_time;
+    if (timerBLINK.on) timerBLINK.time = timerBLINK.time + cycle_time;
     if (timer2.on) timer2.time = timer2.time + cycle_time;
 }
+
