@@ -30,7 +30,7 @@ typedef enum{
     
 } estadosT3;
 
-//Estados do Tapete 3
+//Estados do Tapete 4
 typedef enum{
     
 } estadosT4; */
@@ -50,26 +50,28 @@ timerBlock timerBLINK, timer2;
 //Estados iniciais
 estadosBLINK blinkState = lwaitOFF;
 
+//Declara funções para os timers
 void update_timers();
 void start_timer(timerBlock* t);
 void stop_timer (timerBlock* t); 
 
-int *previousSTART; //onde guardar o estado anterior de START
+bool *previousSTART; //pointer para o estado anterior de START
+bool *previousSTOP; //pointer para o estado anterior de STOP
 
 //-------Funções flanco---------
 
 bool flanco_ascendente(bool sensor, bool *previous){ //dás o sensor e o seu valor anterior
     bool flanco;
-    if (sensor != *previous) flanco = true;
+    if (sensor > *previous) flanco = true;
     else flanco = false;
 
-    previous = sensor;
+    *previous = sensor;
     return flanco;
 }
 
 bool flanco_descendente (bool sensor, bool *previous){ //dás o sensor e o valor anterior
     bool flanco;
-    if (sensor != *previous){
+    if (sensor < *previous){
         flanco = true;
     }
     else flanco = false;
@@ -81,25 +83,37 @@ bool flanco_descendente (bool sensor, bool *previous){ //dás o sensor e o valor
 
 int main() {
 
+
+    previousSTOP = (bool*) malloc(sizeof(bool));
+    previousSTART = (bool*) malloc(sizeof(bool));
+    *previousSTOP = 1; //botão STOP tem lógica negada -> está a 1 desligado
+    *previousSTART = 0; //inicializado desligado - lógica normal
+
+
     while(1){
         
         update_timers();
+        //printf("Timer atualizado com sucesso!\n");
         read_inputs();
+        //printf("Entradas lidas com sucesso!\n");
 
-        printf("TIMER BLINK: %d\n", (int)timerBLINK.time);
+        if (previousSTOP == NULL) printf("We got a problem with the stop pointer here chief\n");
 
-        if (flanco_ascendente(STOP,previousSTART))  printf("\nCLICASTE NO STOP WOW\n");          //botão STOP tem lógica negada
+        //printf ("PREVIOUS STOP VALUE=%d\n",*previousSTOP);
+
+        if (flanco_ascendente(STOP,previousSTOP)) printf("\nCLICASTE NO STOP WOW\n");           
         if (flanco_descendente(START,previousSTART))  printf("\nCLICASTE NO START WOW\n");  //botão START flanco git
 
         //-------------TRANSIÇÃO DE ESTADOS----------
 
+/*
         //BLINK
         switch (blinkState){    //NEEDS CORRECTING
     
             case lwaitON:
     
             start_timer(&timerBLINK);
-            if (/*ACABAR O MODO A_PARAR*/) {
+            if (ACABAR O MODO A_PARAR) { //ACABAR O MODO A_PARAR
                 blinkState = lwaitOFF;
                 stop_timer(&timerBLINK);
                 break;
@@ -113,7 +127,7 @@ int main() {
 
             start_timer(&timerBLINK);
 
-            if (flanco_descendente(STOP)){ //começa a piscar?
+            if (flanco_descendente(STOP,previousSTOP)){ //começa a piscar?
                 blinkState = lwaitON;
                 break;
             }   
@@ -137,7 +151,7 @@ int main() {
         case lwaitOFF:
             LWAIT = 0;
             break;
-        }
+        } */
 
         write_outputs();
     
