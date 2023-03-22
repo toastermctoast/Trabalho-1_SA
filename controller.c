@@ -56,7 +56,10 @@ void start_timer(timerBlock* t);
 void stop_timer (timerBlock* t); 
 
 bool *previousSTART; //pointer para o estado anterior de START
+bool flancoSTART;
 bool *previousSTOP; //pointer para o estado anterior de STOP
+bool flancoSTOP;
+
 
 //-------Funções flanco---------
 
@@ -80,9 +83,14 @@ bool flanco_descendente (bool sensor, bool *previous){ //dás o sensor e o valor
     return flanco;
 }
 
+void ler_flancos(){
+
+    flancoSTART = flanco_descendente(START,previousSTART); 
+    flancoSTOP = flanco_ascendente(STOP,previousSTOP);
+}
+
 
 int main() {
-
 
     previousSTOP = (bool*) malloc(sizeof(bool));
     previousSTART = (bool*) malloc(sizeof(bool));
@@ -90,49 +98,54 @@ int main() {
     *previousSTART = 0; //inicializado desligado - lógica normal
 
 
+
+    if (previousSTOP == NULL) printf("We got a problem with the stop pointer here chief\n");
+
+
     while(1){
         
         update_timers();
-        //printf("Timer atualizado com sucesso!\n");
         read_inputs();
-        //printf("Entradas lidas com sucesso!\n");
+        ler_flancos();
 
-        if (previousSTOP == NULL) printf("We got a problem with the stop pointer here chief\n");
-
-        //printf ("PREVIOUS STOP VALUE=%d\n",*previousSTOP);
-
-        if (flanco_ascendente(STOP,previousSTOP)) printf("\nCLICASTE NO STOP WOW\n");           
-        if (flanco_descendente(START,previousSTART))  printf("\nCLICASTE NO START WOW\n");  //botão START flanco git
+        if (flancoSTOP) printf("\nCLICASTE NO STOP WOW\n");           
+        if (flancoSTART)  printf("\nCLICASTE NO START WOW\n");  //botão START flanco
 
         //-------------TRANSIÇÃO DE ESTADOS----------
 
-/*
         //BLINK
         switch (blinkState){    //NEEDS CORRECTING
     
             case lwaitON:
     
-            start_timer(&timerBLINK);
-            if (ACABAR O MODO A_PARAR) { //ACABAR O MODO A_PARAR
+            printf("Estado: LWAITON\nTimerBLINK:%d\nTimer2:%d\n\n",(int)timerBLINK.time,(int)timer2.time);
+            
+            if (timer2.time >= 15000) { //ACABAR O MODO A_PARAR
                 blinkState = lwaitOFF;
                 stop_timer(&timerBLINK);
+                stop_timer(&timer2);
                 break;
             }
 
-            if (timer2.time > 1)
+            if (timerBLINK.time >= 1000){
             blinkState = lwaitOFF;
+            start_timer(&timerBLINK); 
+            }
             break;
     
             case lwaitOFF:         
 
-            start_timer(&timerBLINK);
+            printf("Estado: LWAITOFF\nTimerBLINK:%d\nTimer2:%d\n\n",(int)timerBLINK.time,(int)timer2.time);
 
-            if (flanco_descendente(STOP,previousSTOP)){ //começa a piscar?
+            if (flancoSTOP){ //começa a piscar se o STOP for largado (lógica negada)
+                start_timer(&timer2);
+                start_timer(&timerBLINK);
                 blinkState = lwaitON;
                 break;
             }   
-            if (timerBLINK.time>1){                     
+            if (timerBLINK.time>1000){ //tempo em milisegundos                     
                 blinkState = lwaitON;
+                start_timer(&timerBLINK);
                 break;
             } 
         }
@@ -151,7 +164,7 @@ int main() {
         case lwaitOFF:
             LWAIT = 0;
             break;
-        } */
+        } 
 
         write_outputs();
     
