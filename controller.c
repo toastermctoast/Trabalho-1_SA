@@ -27,8 +27,8 @@ typedef enum{
     T2_IDLE,
     T2_MANTER,
     T2_MUDAR,
-    T2_CONTINUAR,
-    T2_WAIT,
+    T2_RECEIVE,
+    T2_ST,
     T2_FLUSH
 } estadosT2;
 
@@ -37,8 +37,8 @@ typedef enum{
     T3_IDLE,
     T3_MANTER,
     T3_MUDAR,
-    T3_CONTINUAR,
-    T3_WAIT,
+    T3_RECEIVE,
+    T3_ST,
     T3_FLUSH
 } estadosT3;
 
@@ -144,7 +144,7 @@ int main() {
         read_inputs();
         ler_flancos();
 
-        printf("ESTADO T2:%d  ESTADO T3:%d \n",t2_state,t3_state);
+        printf("T1 :%d  T4:%d    T2:%d  T3:%d  P1: %d  P2:%d\n",t1_state,t4_state,t2_state,t3_state,p1_state,p2_state);
 
         //-------------TRANSIÇÃO DE ESTADOS----------
 
@@ -157,13 +157,13 @@ int main() {
         
         case T1_LIGADO:
             if (flancoSTOP) start_timer(&timerFLUSH);
-            if (SV1 != 0) start_timer(&timerFLUSH);
+            if (SV1 != 0) timerFLUSH.time=0;
             if (timerFLUSH.time >= 10000) t1_state = T1_IDLE;
-            if (SV1 != 0 && (t2_state == T2_WAIT || t3_state == T3_MUDAR)) t1_state = T1_QUEUE;
+            if (SV1 != 0 && (t3_state == T3_MUDAR || t2_state == T2_RECEIVE || t2_state == T2_ST)) t1_state = T1_QUEUE; 
             break;
         
         case T1_QUEUE:
-            if (t2_state != T2_WAIT && t3_state != T3_MUDAR) t1_state = T1_LIGADO;
+            if (t3_state != T3_MUDAR && t2_state != T2_RECEIVE) t1_state = T1_LIGADO;
             break;
         }
 
@@ -176,13 +176,13 @@ int main() {
         
         case T4_LIGADO:
             if (flancoSTOP) start_timer(&timerFLUSH);
-            if (SV2 != 0) start_timer(&timerFLUSH);
+            if (SV2 != 0) timerFLUSH.time=0;
             if (timerFLUSH.time >= 10000) t2_state = T4_IDLE;
-             if (SV2 != 0 && (t3_state == T3_WAIT || t2_state == T2_MUDAR)) t4_state = T4_QUEUE;
+            if (SV2 != 0 && (t2_state == T2_MUDAR || t3_state == T3_RECEIVE || t2_state == T2_ST)) t4_state = T4_QUEUE;
             break;
         
         case T4_QUEUE:
-            if (t3_state != T3_WAIT && t2_state != T2_MUDAR) t4_state = T4_LIGADO;
+            if (SPR2 == 1 && (t2_state != T2_MUDAR && t3_state != T3_RECEIVE && t3_state != T3_ST)) t4_state = T4_LIGADO; //
             break;
         }
 
@@ -190,24 +190,26 @@ int main() {
         switch (t2_state)
         {
         case T2_IDLE: 
-            //if (SPR2 == 1) t2_state = T2_CONTINUAR; //NOVO
             if (SV1 == 1) t2_state = T2_MANTER;
             if (SV1 == 4) t2_state = T2_MUDAR;
-            if (t1_state == T1_IDLE && t4_state == T4_IDLE && flancoSTOP) t2_state = T2_FLUSH; 
+            if (t3_state == T3_MUDAR) t2_state = T2_RECEIVE;
+            if (t1_state == T1_IDLE && t4_state == T4_IDLE && flancoSTOP) t2_state = T2_FLUSH; //o flancoSTOP desaparece
             break;
         
         case T2_MANTER:
-            if (flancoSTR1) t2_state = T2_CONTINUAR; 
-            break;
-        case T2_CONTINUAR:  
-            if (flancoST2) t2_state = T2_IDLE;
+            if (flancoST2) t2_state = T2_IDLE; 
             break;
 
         case T2_MUDAR:
-            if (flancoSTR1) t2_state = T2_WAIT;
+            if (flancoSTR1) t2_state = T2_IDLE;
             break;
-        case T2_WAIT:
-            if (SPE2 == 0 && SPR1==1) t2_state = T2_IDLE;
+
+        case T2_RECEIVE:
+            if (PR2 == 1) t2_state = T2_ST;
+            break;
+
+        case T2_ST:
+            if (flancoST2) t2_state = T2_IDLE;
             break;
 
         case T2_FLUSH:
@@ -219,32 +221,32 @@ int main() {
         switch (t3_state)
         {
         case T3_IDLE:
-            //if (SPR1 == 1) t2_state = T2_CONTINUAR; //NOVO
             if (SV2 == 4) t3_state = T3_MANTER;
             if (SV2 == 1) t3_state = T3_MUDAR;
+            if (t2_state == T2_MUDAR) t3_state = T3_RECEIVE;
             if (t1_state == T1_IDLE && t4_state == T4_IDLE && flancoSTOP) t3_state = T3_FLUSH;
             break;
         
         case T3_MANTER:
-            if (flancoSTR2) t3_state = T3_CONTINUAR;
-            break;
-
-        case T3_CONTINUAR:  
             if (flancoST3) t3_state = T3_IDLE;
             break;
 
         case T3_MUDAR:
-            if (flancoSTR2) t3_state = T3_WAIT;
+            if (flancoSTR2) t3_state = T3_IDLE;
+            break;
+        case T3_RECEIVE:
+            if (PR1 == 1) t3_state = T3_ST;
             break;
 
-        case T3_WAIT:
-            if (SPE1 == 0 && SPR2==1) t3_state = T3_IDLE;
+        case T3_ST:
+            if (flancoST3) t3_state = T3_IDLE;
             break;
 
         case T3_FLUSH:
             if (timerFLUSH.time >= 25000) t3_state = T3_IDLE;
             break;
         }
+
         //PUSHER 1
         switch (p1_state)
         {
@@ -273,7 +275,7 @@ int main() {
             break;
         
         case P2_MUDAR: 
-            if (flancoSTR2) p2_state = P2_PUSH;
+            if (flancoSTR2) p2_state = P2_PUSH; 
             break;
 
         case P2_PUSH:
@@ -301,8 +303,6 @@ int main() {
         switch (blink_state){    //NEEDS FINISHING
     
             case lwaitON:
-    
-            //printf("Estado: LWAITON\nTimerBLINK:%d\nTimerFLUSH:%d\n\n",(int)timerBLINK.time,(int)timerFLUSH.time);
             
             if (timerFLUSH.time >= 25000) { //ACABAR O MODO A_PARAR
                 blink_state = lwaitOFF;
@@ -319,9 +319,7 @@ int main() {
     
             case lwaitOFF:         
 
-            //printf("Estado: LWAITOFF\nTimerBLINK:%d\nTimer2:%d\n\n",(int)timerBLINK.time,(int)timerFLUSH.time);
-
-            if (flancoSTOP){ //começa a piscar se o STOP for largado (lógica negada)
+            if (flancoSTOP){ //começa a piscar se o STOP for largado 
                 start_timer(&timerFLUSH);
                 start_timer(&timerBLINK);
                 blink_state = lwaitON;
@@ -374,13 +372,13 @@ int main() {
         switch (t2_state)
         {
         case T2_IDLE:
-        case T2_WAIT:
+        case T2_RECEIVE:
             T2A=0;
             break;
         
         case T2_MANTER:
-        case T2_CONTINUAR:
         case T2_MUDAR:
+        case T2_ST:
         case T2_FLUSH:
             T2A=1;
             break;
@@ -390,13 +388,13 @@ int main() {
         switch (t3_state)
         {
         case T3_IDLE:
-        case T3_WAIT:
+        case T3_RECEIVE:
             T3A=0;
             break;
         
         case T3_MANTER:
-        case T3_CONTINUAR:
         case T3_MUDAR:
+        case T3_ST:
         case T3_FLUSH:
             T3A=1;
             break;
