@@ -147,11 +147,13 @@ int main() {
             if (flancoSTOP) start_timer(&timerFLUSH);
             if (SV1 != 0) timerFLUSH.time=0;
             if (timerFLUSH.time >= 10000) t1_state = T1_IDLE;
-            if (SV1 != 0 && (t2_state == T2_RECEIVE || t2_state == T2_ST || t2_state == T2_PULL)) t1_state = T1_QUEUE; 
+            //if (SV1 != 0 && (t2_state == T2_RECEIVE || t2_state == T2_ST || t2_state == T2_PULL)) t1_state = T1_QUEUE; 
+            if (SV1 != 0 && (t2_state != T2_MUDAR && t2_state != T2_MANTER)) t1_state = T1_QUEUE;
             break;
         
         case T1_QUEUE:
-            if (t2_state != T2_RECEIVE && t2_state != T2_ST && t2_state != T2_PULL) t1_state = T1_LIGADO;
+            //if (t2_state != T2_RECEIVE && t2_state != T2_ST && t2_state != T2_PULL) t1_state = T1_LIGADO;
+            if (t2_state == T2_MUDAR || t2_state == T2_MANTER) t1_state = T1_LIGADO;
             break;
         }
 
@@ -166,11 +168,13 @@ int main() {
             if (flancoSTOP) start_timer(&timerFLUSH);
             if (SV2 != 0) timerFLUSH.time=0;
             if (timerFLUSH.time >= 10000) t4_state = T4_IDLE;
-            if (SV2 != 0 && (t3_state == T3_RECEIVE || t3_state == T3_ST || t3_state == T3_PULL)) t4_state = T4_QUEUE;
+            //if (SV2 != 0 && (t3_state == T3_RECEIVE || t3_state == T3_ST || t3_state == T3_PULL)) t4_state = T4_QUEUE;
+            if (SV2 != 0 && (t3_state != T3_MUDAR && t3_state != T3_MANTER)) t4_state = T4_QUEUE;
             break;
         
         case T4_QUEUE:
-            if (t3_state != T3_RECEIVE && t3_state != T3_ST && t3_state != T3_PULL) t4_state = T4_LIGADO; 
+            //if (t3_state != T3_RECEIVE && t3_state != T3_ST && t3_state != T3_PULL) t4_state = T4_LIGADO; 
+            if (t3_state == T3_MUDAR || t3_state == T3_MANTER) t4_state = T4_LIGADO;
             break;
         }
 
