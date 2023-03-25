@@ -27,6 +27,9 @@ typedef enum{
     T2_IDLE,
     T2_MANTER,
     T2_MUDAR,
+    T2_READY,
+    T2_PUSH,
+    T2_PULL,
     T2_RECEIVE,
     T2_ST,
     T2_FLUSH
@@ -37,6 +40,9 @@ typedef enum{
     T3_IDLE,
     T3_MANTER,
     T3_MUDAR,
+    T3_READY,
+    T3_PUSH,
+    T3_PULL,
     T3_RECEIVE,
     T3_ST,
     T3_FLUSH
@@ -48,22 +54,6 @@ typedef enum{
     T4_LIGADO,
     T4_QUEUE
 } estadosT4; 
-
-//Estados Pusher 1
-typedef enum{
-    P1_IDLE,
-    P1_MUDAR,
-    P1_PUSH,
-    P1_PULL
-}estadosP1;
-
-//Estados Pusher 2
-typedef enum{
-    P2_IDLE,
-    P2_MUDAR,
-    P2_PUSH,
-    P2_PULL
-}estadosP2;
 
 //Estados Emitters
 typedef enum{
@@ -89,8 +79,6 @@ estadosT1 t1_state = T1_IDLE;
 estadosT4 t4_state = T4_IDLE;
 estadosT2 t2_state = T2_IDLE;
 estadosT3 t3_state = T3_IDLE;
-estadosP1 p1_state = P1_IDLE;
-estadosP2 p2_state = P2_IDLE;
 estadosEM em_state = EM_OFF;
 
 //Declara funções para os timers
@@ -144,7 +132,7 @@ int main() {
         read_inputs();
         ler_flancos();
 
-        printf("T1 :%d  T4:%d    T2:%d  T3:%d  P1: %d  P2:%d\n",t1_state,t4_state,t2_state,t3_state,p1_state,p2_state);
+        printf("T1 :%d  T4:%d    T2:%d  T3:%d\n",t1_state,t4_state,t2_state,t3_state);
 
         //-------------TRANSIÇÃO DE ESTADOS----------
 
@@ -159,11 +147,11 @@ int main() {
             if (flancoSTOP) start_timer(&timerFLUSH);
             if (SV1 != 0) timerFLUSH.time=0;
             if (timerFLUSH.time >= 10000) t1_state = T1_IDLE;
-            if (SV1 != 0 && (t3_state == T3_MUDAR || t2_state == T2_RECEIVE || t2_state == T2_ST)) t1_state = T1_QUEUE; 
+            if (SV1 != 0 && (t2_state == T2_RECEIVE || t2_state == T2_ST || t2_state == T2_PULL)) t1_state = T1_QUEUE; 
             break;
         
         case T1_QUEUE:
-            if (t3_state != T3_MUDAR && t2_state != T2_RECEIVE) t1_state = T1_LIGADO;
+            if (t2_state != T2_RECEIVE && t2_state != T2_ST && t2_state != T2_PULL) t1_state = T1_LIGADO;
             break;
         }
 
@@ -177,12 +165,12 @@ int main() {
         case T4_LIGADO:
             if (flancoSTOP) start_timer(&timerFLUSH);
             if (SV2 != 0) timerFLUSH.time=0;
-            if (timerFLUSH.time >= 10000) t2_state = T4_IDLE;
-            if (SV2 != 0 && (t2_state == T2_MUDAR || t3_state == T3_RECEIVE || t2_state == T2_ST)) t4_state = T4_QUEUE;
+            if (timerFLUSH.time >= 10000) t4_state = T4_IDLE;
+            if (SV2 != 0 && (t3_state == T3_RECEIVE || t3_state == T3_ST || t3_state == T3_PULL)) t4_state = T4_QUEUE;
             break;
         
         case T4_QUEUE:
-            if (SPR2 == 1 && (t2_state != T2_MUDAR && t3_state != T3_RECEIVE && t3_state != T3_ST)) t4_state = T4_LIGADO; //
+            if (t3_state != T3_RECEIVE && t3_state != T3_ST && t3_state != T3_PULL) t4_state = T4_LIGADO; 
             break;
         }
 
@@ -192,7 +180,7 @@ int main() {
         case T2_IDLE: 
             if (SV1 == 1) t2_state = T2_MANTER;
             if (SV1 == 4) t2_state = T2_MUDAR;
-            if (t3_state == T3_MUDAR) t2_state = T2_RECEIVE;
+            if (t3_state == T3_MUDAR || t3_state == T3_READY) t2_state = T2_RECEIVE;
             if (t1_state == T1_IDLE && t4_state == T4_IDLE && flancoSTOP) t2_state = T2_FLUSH; //o flancoSTOP desaparece
             break;
         
@@ -201,7 +189,19 @@ int main() {
             break;
 
         case T2_MUDAR:
-            if (flancoSTR1) t2_state = T2_IDLE;
+            if (flancoSTR1) t2_state = T2_READY;
+            break;
+
+        case T2_READY:
+            if (t3_state == T3_RECEIVE) t2_state = T2_PUSH;
+            break;
+
+        case T2_PUSH:
+            if (SPE1 == 1) t2_state = T2_PULL; 
+            break;
+
+        case T2_PULL:
+            if (SPR1 == 1) t2_state = T2_IDLE;
             break;
 
         case T2_RECEIVE:
@@ -223,7 +223,7 @@ int main() {
         case T3_IDLE:
             if (SV2 == 4) t3_state = T3_MANTER;
             if (SV2 == 1) t3_state = T3_MUDAR;
-            if (t2_state == T2_MUDAR) t3_state = T3_RECEIVE;
+            if (t2_state == T2_MUDAR || t2_state == T2_READY) t3_state = T3_RECEIVE;
             if (t1_state == T1_IDLE && t4_state == T4_IDLE && flancoSTOP) t3_state = T3_FLUSH;
             break;
         
@@ -232,8 +232,21 @@ int main() {
             break;
 
         case T3_MUDAR:
-            if (flancoSTR2) t3_state = T3_IDLE;
+            if (flancoSTR2 ) t3_state = T3_READY;
             break;
+
+        case T3_READY:
+            if(t2_state == T2_RECEIVE) t3_state = T3_PUSH;
+            break;
+
+        case T3_PUSH:
+            if (SPE2 == 1) t3_state = T3_PULL; 
+            break;
+
+        case T3_PULL:
+            if (SPR2 == 1) t3_state = T3_IDLE;
+            break;
+
         case T3_RECEIVE:
             if (PR1 == 1) t3_state = T3_ST;
             break;
@@ -244,46 +257,6 @@ int main() {
 
         case T3_FLUSH:
             if (timerFLUSH.time >= 25000) t3_state = T3_IDLE;
-            break;
-        }
-
-        //PUSHER 1
-        switch (p1_state)
-        {
-        case P1_IDLE:
-            if(SV1 == 4) p1_state = P1_MUDAR;
-            break;
-        
-        case P1_MUDAR: 
-            if (flancoSTR1) p1_state = P1_PUSH;
-            break;
-
-        case P1_PUSH:
-            if (SPE1 == 1) p1_state = P1_PULL;
-            break;
-    
-        case P1_PULL:
-            if (SPR1 == 1) p1_state = P1_IDLE;
-            break;
-        }
-
-        //PUSHER 2
-        switch (p2_state)
-        {
-        case P2_IDLE:
-            if(SV2 == 1) p2_state = P2_MUDAR;
-            break;
-        
-        case P2_MUDAR: 
-            if (flancoSTR2) p2_state = P2_PUSH; 
-            break;
-
-        case P2_PUSH:
-            if (SPE2 == 1) p2_state = P2_PULL;
-            break;
-    
-        case P2_PULL:
-            if (SPR2 == 1) p2_state = P2_IDLE;
             break;
         }
 
@@ -373,7 +346,10 @@ int main() {
         {
         case T2_IDLE:
         case T2_RECEIVE:
+        case T2_READY:
             T2A=0;
+            PE1=0;
+            PR1=0;
             break;
         
         case T2_MANTER:
@@ -381,6 +357,20 @@ int main() {
         case T2_ST:
         case T2_FLUSH:
             T2A=1;
+            PE1=0;
+            PR1=0;
+            break;
+
+        case T2_PUSH:
+            T2A=0;
+            PE1=1;
+            PR1=0;
+            break;
+    
+        case T2_PULL:
+            T2A=0;
+            PE1=0;
+            PR1=1;
             break;
         }
 
@@ -389,7 +379,10 @@ int main() {
         {
         case T3_IDLE:
         case T3_RECEIVE:
+        case T3_READY:
             T3A=0;
+            PE2=0;
+            PR2=0;
             break;
         
         case T3_MANTER:
@@ -397,52 +390,17 @@ int main() {
         case T3_ST:
         case T3_FLUSH:
             T3A=1;
-            break;
-        }
-    
-        //PUSHER 1
-        switch (p1_state)
-        {
-        case P1_IDLE:
-            PE1=0;
-            PR1=0;
-            break;
-        
-        case P1_MUDAR: 
-            PE1=0;
-            PR1=0;
-            break;
-
-        case P1_PUSH:
-            PE1=1;
-            PR1=0;
-            break;
-    
-        case P1_PULL:
-            PE1=0;
-            PR1=1;
-            break;
-        }
-
-        //PUSHER 2
-        switch (p2_state)
-        {
-        case P2_IDLE:
             PE2=0;
             PR2=0;
             break;
-        
-        case P2_MUDAR: 
-            PE2=0;
-            PR2=0;
-            break;
-
-        case P2_PUSH:
+        case T3_PUSH:
+            T3A=0;
             PE2=1;
             PR2=0;
             break;
     
-        case P2_PULL:
+        case T3_PULL:
+            T3A=0;
             PE2=0;
             PR2=1;
             break;
