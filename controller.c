@@ -14,6 +14,15 @@ typedef struct {
     uint64_t time; 
 } timerBlock;
 
+//Estados VERDES
+typedef enum{
+    C_VERDES
+}estadosVERDES;
+
+//Estados AZUIS
+typedef enum {
+    C_AZUIS
+}estadosAZUIS;
 
 //Estados do Tapete 1
 typedef enum {
@@ -133,8 +142,25 @@ int main() {
         ler_flancos();
 
         printf("T1 :%d  T4:%d    T2:%d  T3:%d\n",t1_state,t4_state,t2_state,t3_state);
+        printf("BLINK: %d   FLUSH: %d\n\n", (int)timerBLINK.time, (int)timerFLUSH.time);
 
         //-------------TRANSIÇÃO DE ESTADOS----------
+        
+        //C_VERDES
+        if (flancoST2){
+            AZUIS = AZUIS + 1;
+        }
+        if (flancoSTART && t1_state == T1_IDLE && t4_state == T4_IDLE  && timerFLUSH.time == 0){
+            AZUIS = 0;
+        }
+
+        //C_AZUIS
+        if (flancoST3){
+            VERDES = VERDES + 1;
+        }
+        if (flancoSTART && t1_state == T1_IDLE && t4_state == T4_IDLE  && timerFLUSH.time == 0) {
+            VERDES = 0;
+        }
 
         //TAPETE 1
         switch (t1_state)
@@ -147,12 +173,10 @@ int main() {
             if (flancoSTOP) start_timer(&timerFLUSH);
             if (SV1 != 0) timerFLUSH.time=0;
             if (timerFLUSH.time >= 10000) t1_state = T1_IDLE;
-            //if (SV1 != 0 && (t2_state == T2_RECEIVE || t2_state == T2_ST || t2_state == T2_PULL)) t1_state = T1_QUEUE; 
             if (SV1 != 0 && (t2_state != T2_MUDAR && t2_state != T2_MANTER)) t1_state = T1_QUEUE;
             break;
         
         case T1_QUEUE:
-            //if (t2_state != T2_RECEIVE && t2_state != T2_ST && t2_state != T2_PULL) t1_state = T1_LIGADO;
             if (t2_state == T2_MUDAR || t2_state == T2_MANTER) t1_state = T1_LIGADO;
             break;
         }
@@ -168,12 +192,10 @@ int main() {
             if (flancoSTOP) start_timer(&timerFLUSH);
             if (SV2 != 0) timerFLUSH.time=0;
             if (timerFLUSH.time >= 10000) t4_state = T4_IDLE;
-            //if (SV2 != 0 && (t3_state == T3_RECEIVE || t3_state == T3_ST || t3_state == T3_PULL)) t4_state = T4_QUEUE;
             if (SV2 != 0 && (t3_state != T3_MUDAR && t3_state != T3_MANTER)) t4_state = T4_QUEUE;
             break;
         
         case T4_QUEUE:
-            //if (t3_state != T3_RECEIVE && t3_state != T3_ST && t3_state != T3_PULL) t4_state = T4_LIGADO; 
             if (t3_state == T3_MUDAR || t3_state == T3_MANTER) t4_state = T4_LIGADO;
             break;
         }
@@ -185,7 +207,7 @@ int main() {
             if (SV1 == 1) t2_state = T2_MANTER;
             if (SV1 == 4) t2_state = T2_MUDAR;
             if (t3_state == T3_MUDAR || t3_state == T3_READY) t2_state = T2_RECEIVE;
-            if (t1_state == T1_IDLE && t4_state == T4_IDLE && flancoSTOP) t2_state = T2_FLUSH; //o flancoSTOP desaparece
+            if (t1_state == T1_IDLE && t4_state == T4_IDLE && timerFLUSH.time >= 10000) t2_state = T2_FLUSH; 
             break;
         
         case T2_MANTER:
@@ -228,7 +250,7 @@ int main() {
             if (SV2 == 4) t3_state = T3_MANTER;
             if (SV2 == 1) t3_state = T3_MUDAR;
             if (t2_state == T2_MUDAR || t2_state == T2_READY) t3_state = T3_RECEIVE;
-            if (t1_state == T1_IDLE && t4_state == T4_IDLE && flancoSTOP) t3_state = T3_FLUSH;
+            if (t1_state == T1_IDLE && t4_state == T4_IDLE && timerFLUSH.time >= 10000) t3_state = T3_FLUSH;
             break;
         
         case T3_MANTER:
@@ -268,7 +290,7 @@ int main() {
         switch (em_state)
         {
         case EM_OFF:
-            if (flancoSTART) em_state = EM_ON;
+            if (flancoSTART && timerFLUSH.time == 0) em_state = EM_ON;
             break;
         
         case EM_ON:
@@ -277,26 +299,32 @@ int main() {
         }
 
         //BLINK
-        switch (blink_state){    //NEEDS FINISHING
-    
-            case lwaitON:
+        switch (blink_state){    
             
+            case lwaitON:
+
             if (timerFLUSH.time >= 25000) { //ACABAR O MODO A_PARAR
-                blink_state = lwaitOFF;
                 stop_timer(&timerBLINK);
                 stop_timer(&timerFLUSH);
+                blink_state = lwaitOFF;
                 break;
             }
 
             if (timerBLINK.time >= 1000){
-            blink_state = lwaitOFF;
-            start_timer(&timerBLINK); 
+                blink_state = lwaitOFF;
+                start_timer(&timerBLINK); 
             }
             break;
     
             case lwaitOFF:         
 
-            if (flancoSTOP){ //começa a piscar se o STOP for largado 
+            if (timerFLUSH.time >= 25000) { //ACABAR O MODO A_PARAR
+                stop_timer(&timerBLINK);
+                stop_timer(&timerFLUSH);
+                break;
+            }
+
+            if (flancoSTOP && t1_state != T1_IDLE && t4_state != T4_IDLE){ //começa a piscar se o STOP for largado 
                 start_timer(&timerFLUSH);
                 start_timer(&timerBLINK);
                 blink_state = lwaitON;
@@ -308,8 +336,6 @@ int main() {
                 break;
             } 
         }
-
-
 
         //--------OUTPUTS----------
 
